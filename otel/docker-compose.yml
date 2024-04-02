@@ -7,7 +7,6 @@ services:
         command:
             - --log.level=DEBUG
             - --api.insecure=true
-            - --api.dashboard=true
             - --providers.docker=true
             - --providers.docker.exposedbydefault=false
             - --entrypoints.web.address=:80
@@ -20,51 +19,54 @@ services:
         labels:
             - traefik.enable=true
             - traefik.http.routers.proxy.rule=Host(`proxy.fbi.com`)
-            # - "traefik.http.routers.proxy.entrypoints=web"
             - traefik.http.routers.proxy.service=api@internal
-            - traefik.http.routers.api.middlewares=lan
-            - traefik.http.middlewares.lan.ipwhitelist.sourcerange=192.168.0.0/24, 192.168.1.0/24
 
-        # logs:
-        #     image: datalust/seq
-        #     restart: unless-stopped
-        #     environment:
-        #         - ACCEPT_EULA=Y
-        #     labels:
-        #         - 'traefik.enable=true'
-        #         - 'traefik.http.routers.logs.rule=Host(`logs.fbi.com`)'
-        #         - 'traefik.http.routers.logs.entrypoints=web'
+    logs:
+        image: datalust/seq
+        restart: unless-stopped
+        environment:
+            - ACCEPT_EULA=Y
+        ports:
+            - 15341:5341
+        labels:
+            - traefik.enable=true
+            - traefik.http.routers.logs.rule=Host(`logs.fbi.com`)
+            - traefik.http.routers.logs.entrypoints=web
 
-        # traces:
-        #     image: jaegertracing/all-in-one
-        #     restart: unless-stopped
-        #     environment:
-        #         - COLLECTOR_OTLP_ENABLED=true
-        #         - 'COLLECTOR_ZIPKIN_HOST_PORT=:9411'
-        #     labels:
-        #         - 'traefik.enable=true'
-        #         - 'traefik.http.routers.traces.rule=Host(`traces.fbi.com`)'
-        #         - 'traefik.http.routers.traces.entrypoints=web'
-        #         - 'traefik.http.services.traces.loadbalancer.server.port=16686'
+    traces:
+        image: jaegertracing/all-in-one
+        restart: unless-stopped
+        environment:
+            - COLLECTOR_OTLP_ENABLED=true
+            - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+        ports:
+            - 14317:4317 # grpc
+            - 14318:4318 # http
+            - 16686:16686
+        labels:
+            - traefik.enable=true
+            - traefik.http.routers.traces.rule=Host(`traces.fbi.com`)
+            - traefik.http.routers.traces.entrypoints=web
+            - traefik.http.services.traces.loadbalancer.server.port=16686
 
-        # worker:
-        #     build:
-        #         context: ./docker
-        #         dockerfile: Dockerfile-dev
-        #     restart: unless-stopped
-        #     command: >
-        #       sh -c '
-        #         pip install -e ".[dev]"
-        #         watchexec \
-        #             -r --project-origin . \
-        #             -w . \
-        #             -e py \
-        #             python -m worker.service
-        #       '
-        #     environment:
-        #         - KEY=${VALUE}
-        #     volumes:
-        #         - ./worker:/work/app
+  # worker:
+  #     build:
+  #         context: ./docker
+  #         dockerfile: Dockerfile-dev
+  #     restart: unless-stopped
+  #     command: >
+  #       sh -c '
+  #         pip install -e ".[dev]"
+  #         watchexec \
+  #             -r --project-origin . \
+  #             -w . \
+  #             -e py \
+  #             python -m worker.service
+  #       '
+  #     environment:
+  #         - KEY=${VALUE}
+  #     volumes:
+  #         - ./worker:/work/app
 #volumes:
 #    postgres_data: {}
 
