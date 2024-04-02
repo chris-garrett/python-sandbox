@@ -1,0 +1,49 @@
+FROM trixie-slim as build
+
+ENV PATH=/work/venv/bin:/opt/node/bin:$PATH
+
+# update system to get security fixes etc
+RUN set -x \
+    && apt-get update && apt-get upgrade -y \
+    && apt-get install -y \
+    xz-utils curl
+
+# install python via miniconda
+RUN set -x \
+    && mkdir -p /tmp/downloads \
+    && curl -L -o /tmp/downloads/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+    && sh /tmp/downloads/miniconda.sh -b -p /tmp/downloads/miniconda \
+    && /tmp/downloads/miniconda/bin/conda create -p /work/venv python=3.11 -y
+
+# watchexec
+RUN set -x \    
+    && curl -o /tmp/watchexec.tar.xz -L -C - https://github.com/watchexec/watchexec/releases/download/v1.24.2/watchexec-1.24.2-x86_64-unknown-linux-gnu.tar.xz \
+    && tar -C /work/bin --strip-components=1 -xvf /tmp/watchexec.tar.xz watchexec-1.24.2-x86_64-unknown-linux-gnu/watchexec
+
+# dockerize
+RUN set -x \        
+    && curl -o /tmp/dockerize.tar.gz -L -C - https://github.com/jwilder/dockerize/releases/download/v0.7.0/dockerize-linux-amd64-v0.7.0.tar.gz \
+    && tar -C /work/bin -xvf /tmp/dockerize.tar.gz \
+    && rm /tmp/dockerize.tar.gz
+
+FROM trixie-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PATH=/work/venv/bin:/work/bin:$PATH
+
+COPY --from=build /work/venv /work/venv
+
+RUN set -x \
+    # update system to get security fixes etc
+    && apt-get update && apt-get upgrade -y \
+    # non-root user
+    && useradd -s /bin/bash -m sprout \
+    && echo "alias l='ls -laFHh'" >> /home/sprout/.bashrc \
+    && echo "alias l='ls -laFHh'" >> /root/.bashrc \    
+    && mkdir -p /work/app \
+    && chown -R sprout:sprout /home/sprout/work \
+    # cleanup
+    && rm -rf /var/lib/apt/lists/* /root/.local/* /root/.cache/*
+
+USER sprout
+WORKDIR /work/app
